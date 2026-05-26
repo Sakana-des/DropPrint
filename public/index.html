@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropPrint - Cetak Dokumen Online Mudah & Cepat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="landing-page">
+
+    <!-- Header / Navbar -->
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="logo">🖨️ DropPrint</div>
+            <nav class="nav-links">
+                <a href="#hero">Beranda</a>
+                <a href="#cara-penggunaan">Cara Penggunaan</a>
+                <a href="#fitur">Fitur Unggulan</a>
+                <a href="login.html" class="nav-btn-secondary">Login Admin</a>
+                <a href="upload.html" class="nav-btn-primary">Mulai Cetak</a>
+            </nav>
+            <div class="menu-toggle" id="mobile-menu-btn">☰</div>
+        </div>
+        <!-- Mobile Dropdown Menu -->
+        <div class="mobile-nav hidden" id="mobile-nav">
+            <a href="#hero" class="mobile-link">Beranda</a>
+            <a href="#cara-penggunaan" class="mobile-link">Cara Penggunaan</a>
+            <a href="#fitur" class="mobile-link">Fitur Unggulan</a>
+            <a href="login.html" class="mobile-link">Login Admin</a>
+            <a href="upload.html" class="mobile-link mobile-btn">Mulai Cetak</a>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="hero" class="hero-section">
+        <div class="hero-bg-glow"></div>
+        <div class="hero-content">
+            <span class="hero-tagline">🚀 Cloud Printing Instan</span>
+            <h1 class="hero-title">Cetak Dokumen & Gambar Tanpa Ribet</h1>
+            <p class="hero-subtitle">
+                Unggah file Anda secara langsung dari smartphone atau laptop, sesuaikan ukuran dan warna cetak, lalu ambil hasilnya di kasir toko tanpa perlu antre lama.
+            </p>
+            <div class="hero-actions">
+                <a href="upload.html" class="btn-hero-primary">Mulai Cetak Sekarang</a>
+                <a href="#cara-penggunaan" class="btn-hero-secondary">Cara Penggunaan</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- How to Use Section -->
+    <section id="cara-penggunaan" class="steps-section">
+        <div class="section-header">
+            <span class="section-tag">PANDUAN</span>
+            <h2 class="section-title">Bagaimana Cara Kerjanya?</h2>
+            <p class="section-subtitle">Hanya butuh 4 langkah mudah untuk mencetak dokumen Anda.</p>
+        </div>
+
+        <div class="steps-grid">
+            <!-- Step 1 -->
+            <div class="step-card">
+                <div class="step-number">01</div>
+                <div class="step-icon">📂</div>
+                <h3 class="step-title">Unggah File</h3>
+                <p class="step-description">Unggah berkas berformat PDF atau gambar (PNG/JPG) Anda secara aman ke server awan kami.</p>
+            </div>
+            <!-- Step 2 -->
+            <div class="step-card">
+                <div class="step-number">02</div>
+                <div class="step-icon">⚙️</div>
+                <h3 class="step-title">Sesuaikan Pilihan</h3>
+                <p class="step-description">Atur preferensi warna cetak, jumlah halaman salinan, tata letak halaman (layout), atau potong gambar langsung.</p>
+            </div>
+            <!-- Step 3 -->
+            <div class="step-card">
+                <div class="step-number">03</div>
+                <div class="step-icon">🎟️</div>
+                <h3 class="step-title">Dapatkan Antrean</h3>
+                <p class="step-description">Selesai mengunggah, Anda akan secara otomatis menerima nomor antrean digital untuk ditunjukkan ke kasir.</p>
+            </div>
+            <!-- Step 4 -->
+            <div class="step-card">
+                <div class="step-number">04</div>
+                <div class="step-icon">🛒</div>
+                <h3 class="step-title">Ambil & Bayar</h3>
+                <p class="step-description">Kunjungi loket kasir pencetakan, tunjukkan nomor antrean Anda, lakukan pembayaran, dan ambil dokumen Anda.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="fitur" class="features-section">
+        <div class="section-header">
+            <span class="section-tag">KELEBIHAN</span>
+            <h2 class="section-title">Kenapa Menggunakan DropPrint?</h2>
+            <p class="section-subtitle">Solusi cetak mandiri modern yang dirancang untuk kenyamanan maksimal Anda.</p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-badge">⚡</div>
+                <h3>Super Cepat</h3>
+                <p>Tidak perlu memindahkan file ke flashdisk atau mengirim email. Langsung drag & drop file, atur cetakan dalam hitungan detik.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-badge">🛡️</div>
+                <h3>Keamanan Terjamin</h3>
+                <p>File Anda disimpan dengan enkripsi aman di Firebase Cloud Storage dan akan dihapus secara berkala demi privasi Anda.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-badge">🎨</div>
+                <h3>Editor Pemotongan Gambar</h3>
+                <p>Lakukan rotasi atau pemotongan (cropping) gambar secara fleksibel tepat sebelum mengunggah tanpa memerlukan aplikasi tambahan.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-badge">📱</div>
+                <h3>Responsif & Mobile Friendly</h3>
+                <p>Akses platform dari perangkat apa saja secara sempurna. Pindai kode QR toko dan langsung unggah file Anda dari ponsel.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Call to Action (CTA) Section -->
+    <section class="cta-section">
+        <div class="cta-card">
+            <h2>Siap untuk Mencetak Dokumen Anda?</h2>
+            <p>Klik tombol di bawah untuk langsung menuju halaman unggah file dan dapatkan antrean cetak Anda sekarang juga.</p>
+            <a href="upload.html" class="btn-cta">Mulai Unggah Berkas</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="landing-footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <span class="logo">🖨️ DropPrint</span>
+                <p>Platform Cloud Printing Instan - Cetak cepat tanpa antrean fisik yang lama.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Navigasi</h4>
+                <a href="#hero">Beranda</a>
+                <a href="#cara-penggunaan">Cara Penggunaan</a>
+                <a href="#fitur">Fitur</a>
+                <a href="login.html">Login Admin</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 DropPrint. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Responsive script -->
+    <script>
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const mobileNav = document.getElementById('mobile-nav');
+
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileNav.classList.toggle('hidden');
+        });
+
+        // Close mobile menu when clicking a link
+        document.querySelectorAll('.mobile-link').forEach(link => {
+            link.addEventListener('click', () => {
+                mobileNav.classList.add('hidden');
+            });
+        });
+    </script>
+</body>
+</html>

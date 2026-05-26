@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>
+        if (sessionStorage.getItem('adminLoggedIn') !== 'true') {
+            window.location.href = 'login.html';
+        }
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropPrint Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Firebase SDK (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    
+    <!-- Load config -->
+    <script src="firebase-config.js"></script>
+</head>
+<body class="admin-layout">
+    
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <span class="icon-printer">🖨️</span>
+            <div>
+                <span class="brand-name">DropPrint</span><br>
+                <span class="brand-sub">Admin</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav" style="display: flex; flex-direction: column; height: 100%;">
+            <a href="#" class="nav-item active">
+                <span class="nav-icon">📊</span> Live Queue
+            </a>
+            <a href="#" class="nav-item">
+                <span class="nav-icon">🕒</span> History
+            </a>
+            <a href="#" class="nav-item">
+                <span class="nav-icon">⚙️</span> Settings
+            </a>
+            <a href="#" class="nav-item" id="logoutBtn" style="color: #dc2626; margin-top: auto;">
+                <span class="nav-icon">🚪</span> Logout
+            </a>
+        </nav>
+
+        <div class="sidebar-qr-box">
+            <div class="qr-placeholder">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=http://localhost:3000/upload.html" alt="QR Code" width="80" height="80" id="sidebarQr">
+            </div>
+            <div class="qr-text">Scan to Upload</div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="topbar">
+            <h1>Live Queue</h1>
+            <button class="btn btn-outline" onclick="clearQueue()">
+                <span class="icon-trash">🗑️</span> Clear Server Data
+            </button>
+        </header>
+
+        <div class="table-card">
+            <table class="queue-table">
+                <thead>
+                    <tr>
+                        <th>Queue No</th>
+                        <th>File Name</th>
+                        <th>Pages/Copies</th>
+                        <th>Color</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="queueTableBody">
+                    <!-- Data injected via Firestore -->
+                </tbody>
+            </table>
+            
+            <div class="table-footer">
+                <div class="showing-text" id="showingText">Showing 0 of 0 entries</div>
+                <div class="pagination">
+                    <button class="page-btn text-btn" disabled>Prev</button>
+                    <button class="page-btn active">1</button>
+                    <button class="page-btn text-btn" disabled>Next</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Check Firebase config
+        if (typeof firebaseConfig === 'undefined' || firebaseConfig.apiKey === "PASTE_API_KEY_DI_SINI") {
+            alert("PERINGATAN: Konfigurasi Firebase belum diisi di 'public/firebase-config.js'!");
+        } else {
+            firebase.initializeApp(firebaseConfig);
+        }
+        
+        const db = firebase.firestore();
+
+        // Update QR code to use the actual host address
+        const currentHost = window.location.origin;
+        document.getElementById('sidebarQr').src = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${currentHost}/upload.html`;
+
+        // Handle logout
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            if (confirm('Apakah Anda yakin ingin logout dari dashboard admin?')) {
+                sessionStorage.removeItem('adminLoggedIn');
+                window.location.href = 'login.html';
+            }
+        });
+
+        const tbody = document.getElementById('queueTableBody');
+        const showingText = document.getElementById('showingText');
+
+        function formatTime(date) {
+            if(!date) return '--:--';
+            return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        }
+
+        // Store existing IDs to detect new additions for highlight animation
+        let existingJobIds = new Set();
+        let isInitialLoad = true;
+
+        function createRow(job, docId) {
+            const tr = document.createElement('tr');
+            tr.dataset.id = docId;
+            
+            let statusClass = 'status-waiting';
+            let statusText = job.status || 'Waiting';
+            if(statusText === 'Printing') statusClass = 'status-printing';
+
+            tr.innerHTML = `
+                <td class="queue-col">${job.queueNumber}</td>
+                <td>
+                    <div class="file-cell">
+                        <span class="file-icon">📄</span>
+                        <span class="file-name">${job.fileName}</span>
+                    </div>
+                </td>
+                <td class="meta-col">${job.pagesCopies}</td>
+                <td class="meta-col">${job.color}</td>
+                <td class="meta-col">${formatTime(job.timestamp)}</td>
+                <td>
+                    <span class="status-badge ${statusClass}" onclick="toggleStatus('${docId}', '${statusText}')" style="cursor:pointer">
+                        <span class="dot"></span> ${statusText}
+                    </span>
+                </td>
+                <td>
+                    <a href="${job.filePath}" download="${job.fileName}" class="action-link" target="_blank">⬇️ Download / Print</a>
+                </td>
+            `;
+            return tr;
+        }
+
+        async function toggleStatus(docId, currentStatus) {
+            const nextStatus = currentStatus === 'Waiting' ? 'Printing' : 'Waiting';
+            try {
+                await db.collection('queue').doc(docId).update({ status: nextStatus });
+            } catch (err) {
+                console.error("Gagal update status", err);
+            }
+        }
+
+        function updateFooter() {
+            const count = tbody.children.length;
+            showingText.textContent = `Showing ${count} of ${count} entries`;
+        }
+
+        async function clearQueue() {
+            if(confirm("Apakah Anda yakin ingin menghapus seluruh data antrean di database Firebase?")) {
+                try {
+                    const snapshot = await db.collection('queue').get();
+                    const batch = db.batch();
+                    snapshot.docs.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    await batch.commit();
+                    tbody.innerHTML = '';
+                    updateFooter();
+                } catch(err) {
+                    alert("Gagal menghapus data: " + err.message);
+                }
+            }
+        }
+
+        // Realtime listener from Firestore
+        db.collection('queue').orderBy('timestamp', 'desc').onSnapshot((snapshot) => {
+            const activeDocs = new Set();
+            
+            snapshot.docChanges().forEach((change) => {
+                const doc = change.doc;
+                const data = doc.data();
+                const docId = doc.id;
+                
+                // Fallback for timestamp during server write latency
+                const timestamp = data.timestamp ? data.timestamp.toDate() : new Date();
+                const job = { ...data, timestamp: timestamp };
+
+                if (change.type === "added") {
+                    const row = createRow(job, docId);
+                    
+                    // Highlight if it's a new row added after page load
+                    if (!isInitialLoad && !existingJobIds.has(docId)) {
+                        row.classList.add('highlight-row');
+                        setTimeout(() => {
+                            row.classList.remove('highlight-row');
+                        }, 3000);
+                    }
+
+                    // Insert at correct index based on children
+                    tbody.appendChild(row);
+                    existingJobIds.add(docId);
+                }
+                
+                if (change.type === "modified") {
+                    const existingRow = tbody.querySelector(`tr[data-id="${docId}"]`);
+                    if (existingRow) {
+                        const newRow = createRow(job, docId);
+                        tbody.replaceChild(newRow, existingRow);
+                    }
+                }
+
+                if (change.type === "removed") {
+                    const existingRow = tbody.querySelector(`tr[data-id="${docId}"]`);
+                    if (existingRow) {
+                        existingRow.remove();
+                    }
+                    existingJobIds.delete(docId);
+                }
+            });
+
+            // Resort rows in UI to guarantee descending timestamp order
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.sort((a, b) => {
+                const aTime = new Date(a.querySelector('td:nth-child(5)').textContent);
+                const bTime = new Date(b.querySelector('td:nth-child(5)').textContent);
+                return bTime - aTime;
+            });
+            tbody.innerHTML = '';
+            rows.forEach(r => tbody.appendChild(r));
+
+            isInitialLoad = false;
+            updateFooter();
+        }, (error) => {
+            console.error("Firestore listening error: ", error);
+        });
+    </script>
+</body>
+</html>

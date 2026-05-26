@@ -1,0 +1,9 @@
+@echo off
+cd /d "%~dp0"
+echo Menjalankan server DropPrint...
+start cmd /k "node server.js"
+echo Menunggu server siap...
+timeout /t 2 >nul
+echo Membuka browser...
+start http://localhost:3000
+echo Server siap digunakan!

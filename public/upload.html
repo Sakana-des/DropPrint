@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropPrint - Upload & Edit</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Cropper.js CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .editor-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .editor-content {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--radius);
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .img-container {
+            max-height: 50vh;
+            margin-bottom: 1rem;
+            text-align: center;
+            background: #eee;
+        }
+        .img-container img {
+            max-width: 100%;
+            max-height: 50vh;
+        }
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;}
+        .form-control { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; font-family: inherit;}
+        .editor-actions { display: flex; gap: 1rem; justify-content: flex-end; }
+        .editor-actions .btn { width: auto; }
+    </style>
+
+    <!-- Firebase SDK (Compat Version) for Firestore & Storage -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    
+    <!-- Load config -->
+    <script src="firebase-config.js"></script>
+</head>
+<body>
+    <div class="container customer-container">
+        <div class="header">
+            <div class="logo">
+                <a href="index.html" style="text-decoration: none; color: inherit;">🖨️ DropPrint</a>
+            </div>
+            <p class="subtitle">Halo, Pelanggan! Silakan unggah file Anda ke Awan.</p>
+        </div>
+
+        <div id="upload-section" class="card">
+            <h2>Pilih File Anda</h2>
+            <p style="margin-bottom:1rem">Unggah dokumen PDF atau Gambar (PNG/JPG) yang ingin dicetak.</p>
+            
+            <form id="uploadForm">
+                <div class="file-drop-area">
+                    <span class="file-icon">📄</span>
+                    <span class="file-msg">Klik atau Drop file di sini</span>
+                    <input class="file-input" type="file" id="document" name="document" accept=".pdf,.png,.jpg,.jpeg" required>
+                </div>
+            </form>
+            <div id="loading" class="loading hidden">Mengunggah ke Firebase Storage...</div>
+            <div style="margin-top: 1rem; text-align: center;">
+                <a href="index.html" class="action-link" style="font-size: 0.9rem;">← Kembali ke Halaman Utama</a>
+            </div>
+        </div>
+
+        <div id="success-section" class="card hidden text-center">
+            <div class="success-icon">✅</div>
+            <h2>Sukses Masuk Antrean!</h2>
+            <div class="queue-card">
+                <span class="queue-label">Nomor Antrean Cetak Anda:</span>
+                <div class="queue-number" id="queueNumberDisplay">#000</div>
+            </div>
+            <p class="instructions">Silakan tunggu panggilan dari admin toko.</p>
+            <button class="btn secondary-btn" onclick="location.reload()">Upload File Lain</button>
+            <div style="margin-top: 1.5rem;">
+                <a href="index.html" class="btn primary-btn">Kembali ke Beranda</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editor -->
+    <div id="editorModal" class="editor-modal hidden">
+        <div class="editor-content">
+            <h2 id="editorTitle">Pengaturan Cetak</h2>
+            <p style="margin-bottom: 1rem; color: var(--text-muted);" id="editorSubtitle">Sesuaikan file Anda sebelum dicetak.</p>
+            
+            <!-- Area Gambar (Crop) -->
+            <div id="imageEditorArea" class="hidden">
+                <div class="img-container">
+                    <img id="imageToCrop" src="" alt="Picture">
+                </div>
+                <div style="margin-bottom:1rem; text-align:center;">
+                    <button type="button" class="btn secondary-btn" style="width:auto; padding:5px 10px;" id="rotateBtn">Rotate 90°</button>
+                </div>
+            </div>
+
+            <!-- Area PDF (Print Settings) -->
+            <div class="settings-grid">
+                <div class="form-group">
+                    <label>Warna Cetak</label>
+                    <select id="settingColor" class="form-control">
+                        <option value="B&W">Hitam Putih (B&W)</option>
+                        <option value="Full Color">Full Color</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Jumlah Salinan (Copies)</label>
+                    <input type="number" id="settingCopies" class="form-control" value="1" min="1">
+                </div>
+                <div class="form-group" id="pdfLayoutGroup">
+                    <label>Layout Halaman (Khusus PDF)</label>
+                    <select id="settingLayout" class="form-control">
+                        <option value="1">1 Halaman per Lembar (Utuh)</option>
+                        <option value="2">2 Halaman per Lembar (Grid Setengah)</option>
+                        <option value="4">4 Halaman per Lembar</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="editor-actions">
+                <button type="button" class="btn secondary-btn" id="cancelEditorBtn">Batal</button>
+                <button type="button" class="btn primary-btn" id="confirmEditorBtn">Selesai & Unggah</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cropper.js Script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script>
+        // Check Firebase config
+        if (typeof firebaseConfig === 'undefined' || firebaseConfig.apiKey === "PASTE_API_KEY_DI_SINI") {
+            alert("PERINGATAN: Konfigurasi Firebase belum diisi di 'public/firebase-config.js'!");
+        } else {
+            // Initialize Firebase
+            firebase.initializeApp(firebaseConfig);
+        }
+        
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        const fileInput = document.querySelector('.file-input');
+        const fileMsg = document.querySelector('.file-msg');
+        const uploadSection = document.getElementById('upload-section');
+        const successSection = document.getElementById('success-section');
+        const queueNumberDisplay = document.getElementById('queueNumberDisplay');
+        const loading = document.getElementById('loading');
+
+        // Editor Elements
+        const editorModal = document.getElementById('editorModal');
+        const imageEditorArea = document.getElementById('imageEditorArea');
+        const imageToCrop = document.getElementById('imageToCrop');
+        const rotateBtn = document.getElementById('rotateBtn');
+        const pdfLayoutGroup = document.getElementById('pdfLayoutGroup');
+        const cancelEditorBtn = document.getElementById('cancelEditorBtn');
+        const confirmEditorBtn = document.getElementById('confirmEditorBtn');
+        const editorTitle = document.getElementById('editorTitle');
+
+        let cropper = null;
+        let selectedFile = null;
+        let fileType = ''; // 'image' or 'pdf'
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                fileMsg.textContent = selectedFile.name;
+                fileMsg.classList.add('has-file');
+                openEditor(selectedFile);
+            } else {
+                fileMsg.textContent = 'Klik atau Drop file di sini';
+                fileMsg.classList.remove('has-file');
+            }
+        });
+
+        function openEditor(file) {
+            editorModal.classList.remove('hidden');
+            
+            if (file.type.startsWith('image/')) {
+                fileType = 'image';
+                imageEditorArea.classList.remove('hidden');
+                pdfLayoutGroup.classList.add('hidden');
+                editorTitle.textContent = "Potong Gambar (Crop) & Pengaturan";
+                
+                const url = URL.createObjectURL(file);
+                imageToCrop.src = url;
+                
+                if (cropper) cropper.destroy();
+                imageToCrop.onload = () => {
+                    cropper = new Cropper(imageToCrop, {
+                        viewMode: 1,
+                        autoCropArea: 1,
+                    });
+                };
+            } else {
+                fileType = 'pdf';
+                imageEditorArea.classList.add('hidden');
+                pdfLayoutGroup.classList.remove('hidden');
+                editorTitle.textContent = "Pengaturan Cetak Dokumen";
+                if (cropper) {
+                    cropper.destroy();
+                    cropper = null;
+                }
+            }
+        }
+
+        rotateBtn.addEventListener('click', () => {
+            if (cropper) cropper.rotate(90);
+        });
+
+        cancelEditorBtn.addEventListener('click', () => {
+            editorModal.classList.add('hidden');
+            fileInput.value = '';
+            fileMsg.textContent = 'Klik atau Drop file di sini';
+            fileMsg.classList.remove('has-file');
+            if(cropper) cropper.destroy();
+        });
+
+        confirmEditorBtn.addEventListener('click', async () => {
+            const color = document.getElementById('settingColor').value;
+            const copies = document.getElementById('settingCopies').value;
+            let layout = '1';
+            
+            editorModal.classList.add('hidden');
+            uploadSection.classList.add('hidden');
+            loading.classList.remove('hidden');
+
+            if (fileType === 'image' && cropper) {
+                const canvas = cropper.getCroppedCanvas();
+                canvas.toBlob(async (blob) => {
+                    await uploadToFirebase(blob, 'cropped-' + selectedFile.name, color, copies, '1');
+                }, selectedFile.type);
+            } else {
+                layout = document.getElementById('settingLayout').value;
+                await uploadToFirebase(selectedFile, selectedFile.name, color, copies, layout);
+            }
+        });
+
+        async function getNextQueueNumber() {
+            try {
+                const snapshot = await db.collection('queue').orderBy('timestamp', 'desc').limit(1).get();
+                if (snapshot.empty) {
+                    return '#001';
+                }
+                const latestDoc = snapshot.docs[0].data();
+                const latestNumStr = latestDoc.queueNumber.replace('#', '');
+                const nextNum = parseInt(latestNumStr, 10) + 1;
+                return '#' + String(nextNum).padStart(3, '0');
+            } catch (err) {
+                console.error("Gagal mendapat nomor antrean, default ke #001", err);
+                return '#001';
+            }
+        }
+
+        async function uploadToFirebase(fileBlob, fileName, color, copies, layout) {
+            try {
+                // 1. Upload to Firebase Storage (secure HTTPS cloud storage)
+                const storageRef = storage.ref('print-files/' + Date.now() + '-' + fileName);
+                const uploadTask = await storageRef.put(fileBlob);
+                const downloadURL = await uploadTask.ref.getDownloadURL();
+
+                // 2. Get next queue number from Firestore
+                const queueNumber = await getNextQueueNumber();
+
+                // 3. Format pages copies label
+                let pagesCopies = `1 / ${copies}`;
+                if (layout > 1) {
+                    pagesCopies = `Grid ${layout} / ${copies}`;
+                }
+
+                // 4. Index data in Firestore
+                await db.collection('queue').add({
+                    queueNumber: queueNumber,
+                    fileName: fileName,
+                    filePath: downloadURL, // cloud HTTPS storage link
+                    pagesCopies: pagesCopies,
+                    color: color,
+                    status: 'Waiting',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // 5. Done
+                loading.classList.add('hidden');
+                successSection.classList.remove('hidden');
+                queueNumberDisplay.textContent = queueNumber;
+            } catch (error) {
+                console.error(error);
+                alert('Gagal mengunggah ke Firebase Storage: ' + error.message);
+                uploadSection.classList.remove('hidden');
+                loading.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
