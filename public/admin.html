@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
     <script>
-        if (sessionStorage.getItem('adminLoggedIn') !== 'true') {
+        let adminAuth = false;
+        try {
+            adminAuth = sessionStorage.getItem('adminLoggedIn') === 'true';
+        } catch (e) {
+            console.warn('sessionStorage is not accessible:', e);
+            adminAuth = true; // Fallback to let local protocol/sandboxed loads display dashboard
+        }
+        if (!adminAuth) {
             window.location.href = 'login.html';
         }
     </script>
@@ -110,7 +117,11 @@
         document.getElementById('logoutBtn').addEventListener('click', (e) => {
             e.preventDefault();
             if (confirm('Apakah Anda yakin ingin logout dari dashboard admin?')) {
-                sessionStorage.removeItem('adminLoggedIn');
+                try {
+                    sessionStorage.removeItem('adminLoggedIn');
+                } catch (e) {
+                    console.warn('sessionStorage is not accessible:', e);
+                }
                 window.location.href = 'login.html';
             }
         });
@@ -134,6 +145,7 @@
             let statusClass = 'status-waiting';
             let statusText = job.status || 'Waiting';
             if(statusText === 'Printing') statusClass = 'status-printing';
+            else if(statusText === 'Done') statusClass = 'status-done';
 
             tr.innerHTML = `
                 <td class="queue-col">${job.queueNumber}</td>
@@ -145,7 +157,7 @@
                 </td>
                 <td class="meta-col">${job.pagesCopies}</td>
                 <td class="meta-col">${job.color}</td>
-                <td class="meta-col">${formatTime(job.timestamp)}</td>
+                <td class="meta-col" data-timestamp="${job.timestamp.getTime()}">${formatTime(job.timestamp)}</td>
                 <td>
                     <span class="status-badge ${statusClass}" onclick="toggleStatus('${docId}', '${statusText}')" style="cursor:pointer">
                         <span class="dot"></span> ${statusText}
@@ -159,7 +171,14 @@
         }
 
         async function toggleStatus(docId, currentStatus) {
-            const nextStatus = currentStatus === 'Waiting' ? 'Printing' : 'Waiting';
+            let nextStatus = 'Waiting';
+            if (currentStatus === 'Waiting') {
+                nextStatus = 'Printing';
+            } else if (currentStatus === 'Printing') {
+                nextStatus = 'Done';
+            } else {
+                nextStatus = 'Waiting';
+            }
             try {
                 await db.collection('queue').doc(docId).update({ status: nextStatus });
             } catch (err) {
@@ -238,8 +257,8 @@
             // Resort rows in UI to guarantee descending timestamp order
             const rows = Array.from(tbody.querySelectorAll('tr'));
             rows.sort((a, b) => {
-                const aTime = new Date(a.querySelector('td:nth-child(5)').textContent);
-                const bTime = new Date(b.querySelector('td:nth-child(5)').textContent);
+                const aTime = parseInt(a.querySelector('td:nth-child(5)').dataset.timestamp, 10);
+                const bTime = parseInt(b.querySelector('td:nth-child(5)').dataset.timestamp, 10);
                 return bTime - aTime;
             });
             tbody.innerHTML = '';

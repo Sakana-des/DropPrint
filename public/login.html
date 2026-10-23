@@ -137,7 +137,13 @@
 
     <script>
         // Redirect if already logged in
-        if (sessionStorage.getItem('adminLoggedIn') === 'true') {
+        let isAdminLoggedIn = false;
+        try {
+            isAdminLoggedIn = sessionStorage.getItem('adminLoggedIn') === 'true';
+        } catch (e) {
+            console.warn('sessionStorage is not accessible:', e);
+        }
+        if (isAdminLoggedIn) {
             window.location.href = 'admin.html';
         }
 
@@ -156,8 +162,13 @@
             // Validate credentials
             if (username === 'admin' && password === 'admin123') {
                 // Success
-                sessionStorage.setItem('adminLoggedIn', 'true');
+                try {
+                    sessionStorage.setItem('adminLoggedIn', 'true');
+                } catch (e) {
+                    console.warn('sessionStorage is not accessible:', e);
+                }
                 errorAlert.classList.add('hidden');
+
                 
                 // Show brief visual feedback before redirecting
                 const submitBtn = loginForm.querySelector('button[type="submit"]');

@@ -85,19 +85,75 @@
             </div>
         </div>
 
-        <div id="success-section" class="card hidden text-center">
-            <div class="success-icon">✅</div>
-            <h2>Sukses Masuk Antrean!</h2>
-            <div class="queue-card">
-                <span class="queue-label">Nomor Antrean Cetak Anda:</span>
-                <div class="queue-number" id="queueNumberDisplay">#000</div>
+        <div id="success-section" class="tracker-card hidden text-center">
+            <div class="success-icon" id="trackerStatusIcon" style="font-size: 3.5rem; margin-bottom: 0.5rem; display: inline-block;">🎉</div>
+            <h2 id="trackerTitle" style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem;">Terima Kasih, Berkas Terunggah!</h2>
+            <p id="trackerSubtitle" style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">Dokumen Anda berhasil masuk sistem dan siap diproses.</p>
+            
+            <div class="tracker-queue-box">
+                <div class="tracker-queue-num" id="queueNumberDisplay">#000</div>
+                <div class="tracker-queue-label">Nomor Antrean Cetak Anda</div>
             </div>
-            <p class="instructions">Silakan tunggu panggilan dari admin toko.</p>
-            <button class="btn secondary-btn" onclick="location.reload()">Upload File Lain</button>
-            <div style="margin-top: 1.5rem;">
-                <a href="index.html" class="btn primary-btn">Kembali ke Beranda</a>
+
+            <!-- Stepper Container -->
+            <div class="stepper-container">
+                <div class="stepper">
+                    <div class="stepper-progress" id="stepperProgress"></div>
+                    
+                    <!-- Step 1: Waiting -->
+                    <div class="step" id="stepWaiting">
+                        <div class="step-circle">1</div>
+                        <div class="step-title">Diterima</div>
+                        <div class="step-desc">Dalam Antrean</div>
+                    </div>
+                    
+                    <!-- Step 2: Printing -->
+                    <div class="step" id="stepPrinting">
+                        <div class="step-circle">2</div>
+                        <div class="step-title">Diproses</div>
+                        <div class="step-desc">Sedang Dicetak</div>
+                    </div>
+                    
+                    <!-- Step 3: Done -->
+                    <div class="step" id="stepDone">
+                        <div class="step-circle">3</div>
+                        <div class="step-title">Selesai</div>
+                        <div class="step-desc">Siap Diambil</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Realtime Alert Box -->
+            <div class="tracker-status-alert" id="trackerAlertBox">
+                <span class="tracker-alert-icon" id="trackerAlertIcon">🕒</span>
+                <span class="tracker-alert-text" id="trackerAlertText">Menghubungkan ke server...</span>
+            </div>
+
+            <!-- File details -->
+            <div class="tracker-file-info">
+                <div class="tracker-file-title">Rincian Dokumen</div>
+                <div class="tracker-info-grid">
+                    <div class="tracker-info-row">
+                        <span class="tracker-info-label">Nama Berkas</span>
+                        <span class="tracker-info-value" id="trackerFileName">-</span>
+                    </div>
+                    <div class="tracker-info-row">
+                        <span class="tracker-info-label">Pilihan Warna</span>
+                        <span class="tracker-info-value" id="trackerColor">-</span>
+                    </div>
+                    <div class="tracker-info-row">
+                        <span class="tracker-info-label">Jumlah / Cetakan</span>
+                        <span class="tracker-info-value" id="trackerPagesCopies">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn secondary-btn" id="btnUploadOther" style="margin-bottom: 0.75rem;">Cetak Dokumen Lain</button>
+            <div>
+                <a href="index.html" class="action-link" style="font-size: 0.9rem;">← Kembali ke Beranda</a>
             </div>
         </div>
+
     </div>
 
     <!-- Modal Editor -->
@@ -160,6 +216,36 @@
         const db = firebase.firestore();
         const storage = firebase.storage();
 
+        let jobListener = null;
+        let queueListener = null;
+
+        // Safe storage helpers to prevent SecurityError in sandbox/file protocol
+        function safeGetSession(key) {
+            try {
+                return sessionStorage.getItem(key);
+            } catch (e) {
+                console.warn('Storage is not accessible:', e);
+                return null;
+            }
+        }
+
+        function safeSetSession(key, value) {
+            try {
+                sessionStorage.setItem(key, value);
+            } catch (e) {
+                console.warn('Storage is not accessible:', e);
+            }
+        }
+
+        function safeRemoveSession(key) {
+            try {
+                sessionStorage.removeItem(key);
+            } catch (e) {
+                console.warn('Storage is not accessible:', e);
+            }
+        }
+
+        // DOM Elements
         const fileInput = document.querySelector('.file-input');
         const fileMsg = document.querySelector('.file-msg');
         const uploadSection = document.getElementById('upload-section');
@@ -176,6 +262,31 @@
         const cancelEditorBtn = document.getElementById('cancelEditorBtn');
         const confirmEditorBtn = document.getElementById('confirmEditorBtn');
         const editorTitle = document.getElementById('editorTitle');
+
+        // Check for active print job session on page load (runs synchronously)
+        const activeJobId = safeGetSession('currentPrintJobId');
+        if (activeJobId && activeJobId !== 'undefined' && activeJobId !== 'null') {
+            uploadSection.classList.add('hidden');
+            successSection.classList.remove('hidden');
+            startLiveTracking(activeJobId);
+        }
+
+        // Handle "Cetak Dokumen Lain" button click
+        document.getElementById('btnUploadOther').addEventListener('click', () => {
+            safeRemoveSession('currentPrintJobId');
+            if (jobListener) { jobListener(); jobListener = null; }
+            if (queueListener) { queueListener(); queueListener = null; }
+            
+            successSection.classList.add('hidden');
+            uploadSection.classList.remove('hidden');
+            
+            // Reset file input
+            fileInput.value = '';
+            fileMsg.textContent = 'Klik atau Drop file di sini';
+            fileMsg.classList.remove('has-file');
+        });
+
+
 
         let cropper = null;
         let selectedFile = null;
@@ -289,7 +400,7 @@
                 }
 
                 // 4. Index data in Firestore
-                await db.collection('queue').add({
+                const docRef = await db.collection('queue').add({
                     queueNumber: queueNumber,
                     fileName: fileName,
                     filePath: downloadURL, // cloud HTTPS storage link
@@ -300,9 +411,12 @@
                 });
 
                 // 5. Done
+                safeSetSession('currentPrintJobId', docRef.id);
                 loading.classList.add('hidden');
                 successSection.classList.remove('hidden');
-                queueNumberDisplay.textContent = queueNumber;
+                
+                // Start real-time status and queue position tracking
+                startLiveTracking(docRef.id);
             } catch (error) {
                 console.error(error);
                 alert('Gagal mengunggah ke Firebase Storage: ' + error.message);
@@ -310,6 +424,156 @@
                 loading.classList.add('hidden');
             }
         }
+
+        function startLiveTracking(docId) {
+            // Cancel existing listeners if any
+            if (jobListener) jobListener();
+            if (queueListener) queueListener();
+
+            // 1. Listen to the specific job document
+            jobListener = db.collection('queue').doc(docId).onSnapshot((doc) => {
+                if (!doc.exists) {
+                    // Smoothly transition back to upload form without blocking alerts/reloads
+                    safeRemoveSession('currentPrintJobId');
+                    if (jobListener) { jobListener(); jobListener = null; }
+                    if (queueListener) { queueListener(); queueListener = null; }
+                    
+                    successSection.classList.add('hidden');
+                    uploadSection.classList.remove('hidden');
+                    
+                    // Reset file input
+                    fileInput.value = '';
+                    fileMsg.textContent = 'Klik atau Drop file di sini';
+                    fileMsg.classList.remove('has-file');
+                    return;
+                }
+
+                const data = doc.data();
+                
+                // Update file details
+                document.getElementById('trackerFileName').textContent = data.fileName || '-';
+                document.getElementById('trackerColor').textContent = data.color || '-';
+                document.getElementById('trackerPagesCopies').textContent = data.pagesCopies || '-';
+                queueNumberDisplay.textContent = data.queueNumber || '#000';
+
+                const status = data.status || 'Waiting';
+
+                // Stepper steps and progress line elements
+                const steps = {
+                    waiting: document.getElementById('stepWaiting'),
+                    printing: document.getElementById('stepPrinting'),
+                    done: document.getElementById('stepDone')
+                };
+                const stepperProgress = document.getElementById('stepperProgress');
+
+                // Reset status step classes
+                steps.waiting.className = 'step';
+                steps.printing.className = 'step';
+                steps.done.className = 'step';
+
+                if (status === 'Waiting') {
+                    // Step 1: Active
+                    steps.waiting.classList.add('active');
+                    stepperProgress.className = 'stepper-progress'; // 0%
+                    
+                    document.getElementById('trackerStatusIcon').textContent = '🕒';
+                    document.getElementById('trackerTitle').textContent = 'Terima Kasih, Berkas Terunggah!';
+                    document.getElementById('trackerSubtitle').textContent = 'Dokumen Anda sudah terkirim ke server dan masuk antrean.';
+                    
+                    document.getElementById('trackerAlertBox').className = 'tracker-status-alert';
+                    document.getElementById('trackerAlertIcon').textContent = '🕒';
+                    
+                    // Listen to jobs ahead
+                    listenToJobsAhead(data.timestamp, docId);
+                } else if (status === 'Printing') {
+                    // Step 1: Completed, Step 2: Active
+                    steps.waiting.classList.add('completed');
+                    steps.printing.classList.add('active');
+                    stepperProgress.className = 'stepper-progress step-2'; // 35%
+                    
+                    document.getElementById('trackerStatusIcon').textContent = '🖨️';
+                    document.getElementById('trackerTitle').textContent = 'Sedang Dicetak!';
+                    document.getElementById('trackerSubtitle').textContent = 'Petugas sedang mencetak berkas Anda di mesin printer.';
+                    
+                    document.getElementById('trackerAlertBox').className = 'tracker-status-alert';
+                    document.getElementById('trackerAlertIcon').textContent = '⚡';
+                    document.getElementById('trackerAlertText').textContent = 'Sedang diproses! Mohon tunggu sebentar di dekat kasir.';
+                    
+                    // Clear queue listener as we are already printing
+                    if (queueListener) {
+                        queueListener();
+                        queueListener = null;
+                    }
+                } else if (status === 'Done') {
+                    // All steps completed
+                    steps.waiting.classList.add('completed');
+                    steps.printing.classList.add('completed');
+                    steps.done.classList.add('completed');
+                    stepperProgress.className = 'stepper-progress step-3'; // 70%
+                    
+                    document.getElementById('trackerStatusIcon').textContent = '✅';
+                    document.getElementById('trackerTitle').textContent = 'Selesai Dicetak!';
+                    document.getElementById('trackerSubtitle').textContent = 'Terima kasih telah mencetak menggunakan DropPrint.';
+                    
+                    document.getElementById('trackerAlertBox').className = 'tracker-status-alert done';
+                    document.getElementById('trackerAlertIcon').textContent = '🎉';
+                    document.getElementById('trackerAlertText').textContent = 'Cek kasir sekarang! Dokumen Anda selesai dan siap diambil.';
+                    
+                    // Clear queue listener
+                    if (queueListener) {
+                        queueListener();
+                        queueListener = null;
+                    }
+                }
+            }, (error) => {
+                console.error("Gagal memantau status dokumen:", error);
+                document.getElementById('trackerAlertText').textContent = "Terjadi masalah koneksi. Mencoba menyambung kembali...";
+            });
+        }
+
+        function listenToJobsAhead(myTimestamp, docId) {
+            if (!myTimestamp) {
+                document.getElementById('trackerAlertText').textContent = "Menghitung posisi antrean...";
+                return;
+            }
+            
+            if (queueListener) queueListener();
+            
+            // Listen to all active queue elements and filter in-memory to prevent complex composite index errors
+            queueListener = db.collection('queue')
+                .orderBy('timestamp', 'asc')
+                .onSnapshot((snapshot) => {
+                    let jobsAhead = 0;
+                    let foundSelf = false;
+                    
+                    for (let doc of snapshot.docs) {
+                        if (doc.id === docId) {
+                            foundSelf = true;
+                            break;
+                        }
+                        
+                        const data = doc.data();
+                        // Only count jobs that are still waiting or printing
+                        if (data.status === 'Waiting' || data.status === 'Printing') {
+                            jobsAhead++;
+                        }
+                    }
+                    
+                    if (foundSelf) {
+                        if (jobsAhead === 0) {
+                            document.getElementById('trackerAlertText').textContent = "Dokumen Anda berada di urutan berikutnya! Silakan bersiap.";
+                        } else {
+                            document.getElementById('trackerAlertText').textContent = `Ada ${jobsAhead} antrean di depan Anda. Harap tunggu sebentar.`;
+                        }
+                    } else {
+                        document.getElementById('trackerAlertText').textContent = "Menghubungkan antrean...";
+                    }
+                }, (error) => {
+                    console.error("Gagal memantau antrean:", error);
+                    document.getElementById('trackerAlertText').textContent = "Menunggu giliran cetak...";
+                });
+        }
+
     </script>
 </body>
 </html>
